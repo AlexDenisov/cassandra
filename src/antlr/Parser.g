@@ -246,6 +246,7 @@ cqlStatement returns [ParsedStatement stmt]
     | st38=createMaterializedViewStatement { $stmt = st38; }
     | st39=dropMaterializedViewStatement   { $stmt = st39; }
     | st40=alterMaterializedViewStatement  { $stmt = st40; }
+    | st41=selectMaxTimestampStatement     { $stmt = st41; }
     ;
 
 /*
@@ -254,6 +255,12 @@ cqlStatement returns [ParsedStatement stmt]
 useStatement returns [UseStatement stmt]
     : K_USE ks=keyspaceName { $stmt = new UseStatement(ks); }
     ;
+
+selectMaxTimestampStatement returns [SelectMaxTimestampStatement stmt]
+    : K_SELECT K_MAX K_TIMESTAMP cf=columnFamilyName '(' t=term ')' {
+      $stmt = new SelectMaxTimestampStatement(cf, t);
+    }
+;
 
 /**
  * SELECT <expression>

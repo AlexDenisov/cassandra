@@ -204,6 +204,7 @@ K_JSON:        J S O N;
 K_DEFAULT:     D E F A U L T;
 K_UNSET:       U N S E T;
 K_LIKE:        L I K E;
+K_MAX:         M A X;
 
 // Case-insensitive alpha characters
 fragment A: ('a'|'A');
