@@ -17,17 +17,25 @@
  */
 package org.apache.cassandra.cql3.statements;
 
+import java.nio.ByteBuffer;
+import java.util.LinkedList;
+import java.util.List;
+
 import org.apache.cassandra.cql3.CFName;
 import org.apache.cassandra.cql3.CQLStatement;
+import org.apache.cassandra.cql3.ColumnIdentifier;
+import org.apache.cassandra.cql3.ColumnSpecification;
 import org.apache.cassandra.cql3.QueryOptions;
+import org.apache.cassandra.cql3.ResultSet;
 import org.apache.cassandra.cql3.Term;
+import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.UnauthorizedException;
 import org.apache.cassandra.schema.Schema;
-import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
+import org.apache.cassandra.transport.messages.ResultMessage;
+import org.apache.cassandra.utils.ByteBufferUtil;
 
 public class SelectMaxTimestampStatement extends CFStatement implements CQLStatement
 {
@@ -61,7 +69,20 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
     public ResultMessage execute(QueryState state, QueryOptions options, long queryStartNanoTime) throws InvalidRequestException
     {
         Schema.instance.validateTable(keyspace(), columnFamily());
-        return new ResultMessage.Void();
+
+        ColumnIdentifier identifier = new ColumnIdentifier("MAX TIMESTAMP", false);
+        Int32Type type = Int32Type.instance;
+        ColumnSpecification specification = new ColumnSpecification(keyspace(), columnFamily(), identifier, type);
+        List<ColumnSpecification> columnSpecifications = new LinkedList<ColumnSpecification>();
+        columnSpecifications.add(specification);
+        ResultSet.ResultMetadata metadata = new ResultSet.ResultMetadata(columnSpecifications);
+        List<List<ByteBuffer>> rows = new LinkedList<List<ByteBuffer>>();
+        List<ByteBuffer> row = new LinkedList<ByteBuffer>();
+        row.add(ByteBufferUtil.bytes(42));
+        rows.add(row);
+        ResultSet rs = new ResultSet(metadata, rows);
+
+        return new ResultMessage.Rows(rs);
     }
 
     public ResultMessage executeInternal(QueryState state, QueryOptions options) throws InvalidRequestException
