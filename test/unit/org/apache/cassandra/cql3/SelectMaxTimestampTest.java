@@ -19,12 +19,20 @@ package org.apache.cassandra.cql3;
 
 import org.junit.Test;
 
+import org.apache.cassandra.exceptions.InvalidRequestException;
+
 public class SelectMaxTimestampTest extends CQLTester
+{
 
     @Test
-    public void testSelectMaxTimestampQuery() throws Throwable
-    {
-        assertRowCount(execute("SELECT MAX TIMESTAMP foo('bar')"), 0);
+    public void testInvalidRequestException_TableDoesNotExist() throws Throwable {
+        assertInvalidThrowMessage("table foo does not exist",
+                                  InvalidRequestException.class,
+                                  "SELECT MAX TIMESTAMP foo('bar');");
+
+        assertInvalidThrowMessage("keyspace buzz does not exist",
+                                  InvalidRequestException.class,
+                                  "SELECT MAX TIMESTAMP buzz.foo('bar');");
     }
 
 }

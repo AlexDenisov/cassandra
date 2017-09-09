@@ -23,18 +23,19 @@ import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.Term;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.UnauthorizedException;
+import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 
-public class SelectMaxTimestampStatement extends ParsedStatement implements CQLStatement
+public class SelectMaxTimestampStatement extends CFStatement implements CQLStatement
 {
-    private final CFName name;
     private final Term.Raw term;
 
     public SelectMaxTimestampStatement(CFName name, Term.Raw term)
     {
-        this.name = name;
+        super(name);
         this.term = term;
     }
 
@@ -59,6 +60,7 @@ public class SelectMaxTimestampStatement extends ParsedStatement implements CQLS
 
     public ResultMessage execute(QueryState state, QueryOptions options, long queryStartNanoTime) throws InvalidRequestException
     {
+        Schema.instance.validateTable(keyspace(), columnFamily());
         return new ResultMessage.Void();
     }
 
