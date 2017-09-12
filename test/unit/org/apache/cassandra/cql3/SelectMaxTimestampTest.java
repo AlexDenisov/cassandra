@@ -36,25 +36,14 @@ public class SelectMaxTimestampTest extends CQLTester
     }
 
     @Test
-    public void testSelectLatestTimestamp_ReturnsOneRow() throws Throwable {
-        execute("CREATE TABLE test (key text, PRIMARY KEY (key));");
+    public void testSelectATimestamp() throws Throwable {
+        createTable("CREATE TABLE test (key text, v int, PRIMARY KEY (key));");
+
+        execute("INSERT INTO test (key, v) VALUES ('foo', 122) USING TIMESTAMP 22;");
+
+        long timestamp = 22;
         assertRows(execute("SELECT MAX TIMESTAMP test('foo');"),
-                   row(42));
-    }
-
-    public void testSelectLatestTimestamp() throws Throwable {
-        execute("CREATE TABLE test (key text, PRIMARY KEY (key));");
-
-        execute("INSERT INTO test (key) VALUES ('foo') USING TIMESTAMP 22;");
-        execute("INSERT INTO test (key) VALUES ('foo') USING TIMESTAMP 14;");
-
-        assertRows(execute("SELECT MAX TIMESTAMP test('foo');"),
-                   row(14));
-
-        execute("INSERT INTO test (key) VALUES ('foo') USING TIMESTAMP 18;");
-
-        assertRows(execute("SELECT MAX TIMESTAMP test('foo');"),
-                   row(18));
+                   row(timestamp));
     }
 }
 

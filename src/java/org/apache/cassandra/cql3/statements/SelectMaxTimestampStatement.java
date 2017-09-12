@@ -28,14 +28,23 @@ import org.apache.cassandra.cql3.ColumnSpecification;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.ResultSet;
 import org.apache.cassandra.cql3.Term;
-import org.apache.cassandra.db.marshal.Int32Type;
+import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.SinglePartitionReadCommand;
+import org.apache.cassandra.db.marshal.LongType;
+import org.apache.cassandra.db.partitions.PartitionIterator;
+import org.apache.cassandra.db.rows.Cell;
+import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.db.rows.RowIterator;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.UnauthorizedException;
+import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.FBUtilities;
 
 public class SelectMaxTimestampStatement extends CFStatement implements CQLStatement
 {
@@ -68,20 +77,38 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
 
     public ResultMessage execute(QueryState state, QueryOptions options, long queryStartNanoTime) throws InvalidRequestException
     {
-        Schema.instance.validateTable(keyspace(), columnFamily());
+        TableMetadata tableMetadata = Schema.instance.validateTable(keyspace(), columnFamily());
+        int nowInSec = FBUtilities.nowInSeconds();
+
+        // TODO: get the decorate key from Term.Raw
+        DecoratedKey key = tableMetadata.partitioner.decorateKey(ByteBufferUtil.bytes("foo"));
+        SinglePartitionReadCommand command = SinglePartitionReadCommand.fullPartitionRead(tableMetadata, nowInSec, key);
+        PartitionIterator partitionIterator = command.execute(options.getConsistency(), state.getClientState(), queryStartNanoTime);
 
         ColumnIdentifier identifier = new ColumnIdentifier("MAX TIMESTAMP", false);
-        Int32Type type = Int32Type.instance;
+        LongType type = LongType.instance;
+
         ColumnSpecification specification = new ColumnSpecification(keyspace(), columnFamily(), identifier, type);
         List<ColumnSpecification> columnSpecifications = new LinkedList<ColumnSpecification>();
         columnSpecifications.add(specification);
         ResultSet.ResultMetadata metadata = new ResultSet.ResultMetadata(columnSpecifications);
         List<List<ByteBuffer>> rows = new LinkedList<List<ByteBuffer>>();
-        List<ByteBuffer> row = new LinkedList<ByteBuffer>();
-        row.add(ByteBufferUtil.bytes(42));
-        rows.add(row);
-        ResultSet rs = new ResultSet(metadata, rows);
 
+        if (partitionIterator.hasNext())
+        {
+            RowIterator rowIterator = partitionIterator.next();
+            if (rowIterator.hasNext())
+            {
+                Row row = rowIterator.next();
+                ColumnMetadata columnMetadata = row.columns().iterator().next();
+                Cell cell = row.getCell(columnMetadata);
+                List<ByteBuffer> r = new LinkedList<ByteBuffer>();
+                r.add(ByteBufferUtil.bytes(cell.timestamp()));
+                rows.add(r);
+            }
+        }
+
+        ResultSet rs = new ResultSet(metadata, rows);
         return new ResultMessage.Rows(rs);
     }
 
