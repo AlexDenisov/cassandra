@@ -80,8 +80,14 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
         TableMetadata tableMetadata = Schema.instance.validateTable(keyspace(), columnFamily());
         int nowInSec = FBUtilities.nowInSeconds();
 
-        // TODO: get the decorate key from Term.Raw
-        DecoratedKey key = tableMetadata.partitioner.decorateKey(ByteBufferUtil.bytes("foo"));
+        ByteBuffer bb = null;
+        for (ColumnMetadata cm: tableMetadata.partitionKeyColumns()) {
+            ColumnSpecification specification = new ColumnSpecification(cm.ksName, cm.cfName, cm.name, cm.type);
+            Term t = term.prepare(keyspace(), specification);
+            bb = t.bindAndGet(options);
+        }
+
+        DecoratedKey key = tableMetadata.partitioner.decorateKey(bb);
         SinglePartitionReadCommand command = SinglePartitionReadCommand.fullPartitionRead(tableMetadata, nowInSec, key);
         PartitionIterator partitionIterator = command.execute(options.getConsistency(), state.getClientState(), queryStartNanoTime);
 
@@ -94,20 +100,28 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
         ResultSet.ResultMetadata metadata = new ResultSet.ResultMetadata(columnSpecifications);
         List<List<ByteBuffer>> rows = new LinkedList<List<ByteBuffer>>();
 
+        long maxTimestamp = 0;
         if (partitionIterator.hasNext())
         {
             RowIterator rowIterator = partitionIterator.next();
-            if (rowIterator.hasNext())
+            while (rowIterator.hasNext())
             {
                 Row row = rowIterator.next();
+                /// TODO: check bounds here. The columns could be empty
+                ///
+                ///   CREATE TABLE test (key text, PRIMARY KEY (key))
+                ///
                 ColumnMetadata columnMetadata = row.columns().iterator().next();
                 Cell cell = row.getCell(columnMetadata);
-                List<ByteBuffer> r = new LinkedList<ByteBuffer>();
-                r.add(ByteBufferUtil.bytes(cell.timestamp()));
-                rows.add(r);
+                if (cell.timestamp() > maxTimestamp) {
+                    maxTimestamp = cell.timestamp();
+                }
             }
         }
 
+        List<ByteBuffer> r = new LinkedList<ByteBuffer>();
+        r.add(ByteBufferUtil.bytes(maxTimestamp));
+        rows.add(r);
         ResultSet rs = new ResultSet(metadata, rows);
         return new ResultMessage.Rows(rs);
     }

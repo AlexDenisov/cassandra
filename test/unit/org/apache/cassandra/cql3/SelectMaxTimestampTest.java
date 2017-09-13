@@ -45,5 +45,28 @@ public class SelectMaxTimestampTest extends CQLTester
         assertRows(execute("SELECT MAX TIMESTAMP test('foo');"),
                    row(timestamp));
     }
+
+    @Test
+    public void testSelectMaxTimestamp() throws Throwable {
+        createTable("CREATE TABLE test_selectMaxTimestamp (key text, v int, PRIMARY KEY (key));");
+
+        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('foo', 122) USING TIMESTAMP 22;");
+        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('foo', 101) USING TIMESTAMP 4;");
+        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('foo', 94) USING TIMESTAMP 42;");
+        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('foo', 40) USING TIMESTAMP 16;");
+
+        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp('foo');"),
+                   row((long)42));
+
+        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('bar', 232) USING TIMESTAMP 28;");
+        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('bar', 115) USING TIMESTAMP 57;");
+        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('bar', 12) USING TIMESTAMP 1;");
+
+        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp('bar');"),
+                   row((long)57));
+
+        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp('buzz');"),
+                   row((long)0));
+    }
 }
 
