@@ -90,5 +90,25 @@ public class SelectMaxTimestampTest extends CQLTester
         assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('buzz', 'bar');"),
                    row((long)0));
     }
+
+    @Test
+    public void testSelectMaxTimestamp_ParametersMismatch() throws Throwable {
+        createTable("CREATE TABLE testSelectMaxTimestamp_ParametersMismatch (k1 text, k2 text, v int, PRIMARY KEY ((k1, k2)));");
+
+        /// Note: cfName is getting lowercased, because of that the error message is not very user-friendly
+        assertInvalidThrowMessage("Supplied parameters do not match: testselectmaxtimestamp_parametersmismatch has 2 partition keys, but received 1",
+                                  InvalidRequestException.class,
+                                  "SELECT MAX TIMESTAMP testSelectMaxTimestamp_ParametersMismatch('foo');");
+    }
+
+    @Test
+    public void testSelectMaxTimestamp_TableHasOnlyPrimaryKeys() throws Throwable {
+        createTable("CREATE TABLE testSelectMaxTimestamp_TableHasOnlyPrimaryKeys (k text, PRIMARY KEY (k));");
+        execute("INSERT INTO testSelectMaxTimestamp_TableHasOnlyPrimaryKeys (k) VALUES ('bar') USING TIMESTAMP 99;");
+        /// Did not decide yet if this case should throw an exception
+        assertRows(execute("SELECT MAX TIMESTAMP testSelectMaxTimestamp_TableHasOnlyPrimaryKeys('bar');"),
+                   row((long)0));
+    }
+
 }
 

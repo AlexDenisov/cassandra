@@ -82,6 +82,14 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
         int nowInSec = FBUtilities.nowInSeconds();
 
         int termsCount = this.terms.size();
+        int partitionKeysCount = tableMetadata.partitionKeyColumns().size();
+
+        if (termsCount != partitionKeysCount) {
+            String message = "Supplied parameters do not match: " + tableMetadata.name + " has " + partitionKeysCount
+                             + " partition keys, but received " + termsCount;
+            throw new InvalidRequestException(message);
+        }
+
         ByteBuffer[] buffers = new ByteBuffer[termsCount];
         Iterator<ColumnMetadata> columnMetadataIterator = tableMetadata.partitionKeyColumns().iterator();
         Iterator<Term.Raw> rawTermIterator = terms.iterator();
@@ -115,11 +123,11 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
             while (rowIterator.hasNext())
             {
                 Row row = rowIterator.next();
-                /// TODO: check bounds here. The columns could be empty
-                ///
-                ///   CREATE TABLE test (key text, PRIMARY KEY (key))
-                ///
-                ColumnMetadata columnMetadata = row.columns().iterator().next();
+                Iterator<ColumnMetadata> iterator = row.columns().iterator();
+                if (!iterator.hasNext()) {
+                    continue;
+                }
+                ColumnMetadata columnMetadata = iterator.next();
                 Cell cell = row.getCell(columnMetadata);
                 if (cell.timestamp() > maxTimestamp) {
                     maxTimestamp = cell.timestamp();
