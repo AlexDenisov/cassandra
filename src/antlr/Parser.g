@@ -256,11 +256,20 @@ useStatement returns [UseStatement stmt]
     : K_USE ks=keyspaceName { $stmt = new UseStatement(ks); }
     ;
 
+/*
+ * SELECT MAX TIMESTAMP ...;
+ */
+
 selectMaxTimestampStatement returns [SelectMaxTimestampStatement stmt]
-    : K_SELECT K_MAX K_TIMESTAMP cf=columnFamilyName '(' t=term ')' {
+    : K_SELECT K_MAX K_TIMESTAMP cf=columnFamilyName '(' t=maxTimestampTerms ')' {
       $stmt = new SelectMaxTimestampStatement(cf, t);
     }
 ;
+
+maxTimestampTerms returns [List<Term.Raw> terms]
+    @init { $terms = new ArrayList<>(); }
+    : t1=term { $terms.add(t1); } (',' ti=term { $terms.add(ti); })*
+    ;
 
 /**
  * SELECT <expression>

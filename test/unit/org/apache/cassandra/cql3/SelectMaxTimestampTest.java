@@ -68,5 +68,27 @@ public class SelectMaxTimestampTest extends CQLTester
         assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp('buzz');"),
                    row((long)0));
     }
+
+    @Test
+    public void testSelectMaxTimestamp_CompositePartitionKey() throws Throwable {
+        createTable("CREATE TABLE test_selectMaxTimestamp_CompositePartitionKey (k1 text, k2 text, v int, PRIMARY KEY ((k1, k2)));");
+
+        execute("INSERT INTO test_selectMaxTimestamp_CompositePartitionKey (k1, k2, v) VALUES ('foo', 'foo', 122) USING TIMESTAMP 22;");
+        execute("INSERT INTO test_selectMaxTimestamp_CompositePartitionKey (k1, k2, v) VALUES ('foo', 'bar', 101) USING TIMESTAMP 4;");
+        execute("INSERT INTO test_selectMaxTimestamp_CompositePartitionKey (k1, k2, v) VALUES ('bar', 'foo', 94) USING TIMESTAMP 42;");
+        execute("INSERT INTO test_selectMaxTimestamp_CompositePartitionKey (k1, k2, v) VALUES ('bar', 'bar', 98) USING TIMESTAMP 63;");
+
+        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('foo', 'foo');"),
+                   row((long)22));
+        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('foo', 'bar');"),
+                   row((long)4));
+        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('bar', 'foo');"),
+                   row((long)42));
+        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('bar', 'bar');"),
+                   row((long)63));
+
+        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('buzz', 'bar');"),
+                   row((long)0));
+    }
 }
 

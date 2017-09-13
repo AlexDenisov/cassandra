@@ -18,6 +18,7 @@
 package org.apache.cassandra.cql3.statements;
 
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -48,12 +49,12 @@ import org.apache.cassandra.utils.FBUtilities;
 
 public class SelectMaxTimestampStatement extends CFStatement implements CQLStatement
 {
-    private final Term.Raw term;
+    private final List<Term.Raw> terms;
 
-    public SelectMaxTimestampStatement(CFName name, Term.Raw term)
+    public SelectMaxTimestampStatement(CFName name, List<Term.Raw> terms)
     {
         super(name);
-        this.term = term;
+        this.terms = terms;
     }
 
     public int getBoundTerms()
@@ -80,14 +81,21 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
         TableMetadata tableMetadata = Schema.instance.validateTable(keyspace(), columnFamily());
         int nowInSec = FBUtilities.nowInSeconds();
 
-        ByteBuffer bb = null;
-        for (ColumnMetadata cm: tableMetadata.partitionKeyColumns()) {
+        int termsCount = this.terms.size();
+        ByteBuffer[] buffers = new ByteBuffer[termsCount];
+        Iterator<ColumnMetadata> columnMetadataIterator = tableMetadata.partitionKeyColumns().iterator();
+        Iterator<Term.Raw> rawTermIterator = terms.iterator();
+        for (int i = 0; i < termsCount; i++) {
+            ColumnMetadata cm = columnMetadataIterator.next();
+            Term.Raw rawTerm = rawTermIterator.next();
+
             ColumnSpecification specification = new ColumnSpecification(cm.ksName, cm.cfName, cm.name, cm.type);
-            Term t = term.prepare(keyspace(), specification);
-            bb = t.bindAndGet(options);
+            Term term = rawTerm.prepare(keyspace(), specification);
+            buffers[i] = term.bindAndGet(options);
         }
 
-        DecoratedKey key = tableMetadata.partitioner.decorateKey(bb);
+        ByteBuffer bufferKey = tableMetadata.partitionKeyAsClusteringComparator().make((Object[]) buffers).serializeAsPartitionKey();
+        DecoratedKey key = tableMetadata.partitioner.decorateKey(bufferKey);
         SinglePartitionReadCommand command = SinglePartitionReadCommand.fullPartitionRead(tableMetadata, nowInSec, key);
         PartitionIterator partitionIterator = command.execute(options.getConsistency(), state.getClientState(), queryStartNanoTime);
 
