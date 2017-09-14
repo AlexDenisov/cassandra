@@ -4804,4 +4804,19 @@ public class SelectTest extends CQLTester
         }
     }
 
+    @Test
+    public void testFunctionCallsWithWrongNumberOfArguments() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k1 int, k2 int, i int, PRIMARY KEY ((k1, k2)))");
+
+        execute("INSERT INTO %s(k1, k2) VALUES(42, 35)");
+
+        assertInvalidThrowMessage("Incorrect number of arguments specified for function system.token : (int, int) -> bigint (expected 2, found 1)",
+                                  InvalidRequestException.class,
+                                  "SELECT * from %s where token(k1, k2) > token('12')");
+        assertInvalidThrowMessage("Incorrect number of arguments specified for function system.token : (int, int) -> bigint (expected 2, found 1)",
+                                  InvalidRequestException.class,
+                                  "SELECT token(k1) from %s");
+    }
+
 }

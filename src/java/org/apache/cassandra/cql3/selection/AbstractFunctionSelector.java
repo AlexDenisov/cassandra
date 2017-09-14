@@ -33,6 +33,8 @@ import org.apache.cassandra.db.filter.ColumnFilter;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 
+import static org.apache.cassandra.cql3.statements.RequestValidations.invalidRequest;
+
 abstract class AbstractFunctionSelector<T extends Function> extends Selector
 {
     protected final T fun;
@@ -87,8 +89,13 @@ abstract class AbstractFunctionSelector<T extends Function> extends Selector
 
             public Selector newInstance(QueryOptions options) throws InvalidRequestException
             {
-                return fun.isAggregate() ? new AggregateFunctionSelector(fun, factories.newInstances(options))
-                                         : new ScalarFunctionSelector(fun, factories.newInstances(options));
+                List<Selector> selectors = factories.newInstances(options);
+                if (fun.argTypes().size() != selectors.size())
+                    throw invalidRequest("Incorrect number of arguments specified for function %s (expected %d, found %d)",
+                                  fun, fun.argTypes().size(), selectors.size());
+
+                return fun.isAggregate() ? new AggregateFunctionSelector(fun, selectors)
+                                         : new ScalarFunctionSelector(fun, selectors);
             }
 
             public boolean isWritetimeSelectorFactory()
