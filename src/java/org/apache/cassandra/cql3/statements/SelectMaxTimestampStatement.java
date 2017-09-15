@@ -30,6 +30,7 @@ import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.ResultSet;
 import org.apache.cassandra.cql3.Term;
 import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.marshal.LongType;
 import org.apache.cassandra.db.partitions.PartitionIterator;
@@ -74,13 +75,7 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
 
     public void validate(ClientState state) throws InvalidRequestException
     {
-    }
-
-    public ResultMessage execute(QueryState state, QueryOptions options, long queryStartNanoTime) throws InvalidRequestException
-    {
         TableMetadata tableMetadata = Schema.instance.validateTable(keyspace(), columnFamily());
-        int nowInSec = FBUtilities.nowInSeconds();
-
         int termsCount = this.terms.size();
         int partitionKeysCount = tableMetadata.partitionKeyColumns().size();
 
@@ -89,6 +84,23 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
                              + " partition keys, but received " + termsCount;
             throw new InvalidRequestException(message);
         }
+    }
+
+    public ResultMessage execute(QueryState state, QueryOptions options, long queryStartNanoTime) throws InvalidRequestException
+    {
+        PartitionIterator partitionIterator = fetchPartition(options, state, queryStartNanoTime);
+        long timestamp = findMaxTimestampAcrossPartition(partitionIterator);
+        return new ResultMessage.Rows(buildResultSet(timestamp));
+    }
+
+    public ResultMessage executeInternal(QueryState state, QueryOptions options) throws InvalidRequestException
+    {
+        return execute(state, options, System.nanoTime());
+    }
+
+    private DecoratedKey decoratedKeyForPartition(TableMetadata tableMetadata, QueryOptions options)
+    {
+        int termsCount = this.terms.size();
 
         ByteBuffer[] buffers = new ByteBuffer[termsCount];
         Iterator<ColumnMetadata> columnMetadataIterator = tableMetadata.partitionKeyColumns().iterator();
@@ -103,46 +115,64 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
         }
 
         ByteBuffer bufferKey = tableMetadata.partitionKeyAsClusteringComparator().make((Object[]) buffers).serializeAsPartitionKey();
-        DecoratedKey key = tableMetadata.partitioner.decorateKey(bufferKey);
-        SinglePartitionReadCommand command = SinglePartitionReadCommand.fullPartitionRead(tableMetadata, nowInSec, key);
-        PartitionIterator partitionIterator = command.execute(options.getConsistency(), state.getClientState(), queryStartNanoTime);
 
-        ColumnIdentifier identifier = new ColumnIdentifier("MAX TIMESTAMP", false);
-        LongType type = LongType.instance;
+        return tableMetadata.partitioner.decorateKey(bufferKey);
+    }
 
-        ColumnSpecification specification = new ColumnSpecification(keyspace(), columnFamily(), identifier, type);
-        List<ColumnSpecification> columnSpecifications = new LinkedList<ColumnSpecification>();
-        columnSpecifications.add(specification);
-        ResultSet.ResultMetadata metadata = new ResultSet.ResultMetadata(columnSpecifications);
-        List<List<ByteBuffer>> rows = new LinkedList<List<ByteBuffer>>();
-
+    private long findMaxTimestampAcrossPartition(PartitionIterator partitionIterator)
+    {
         long maxTimestamp = 0;
+
         if (partitionIterator.hasNext())
         {
             RowIterator rowIterator = partitionIterator.next();
             while (rowIterator.hasNext())
             {
                 Row row = rowIterator.next();
-                Iterator<ColumnMetadata> iterator = row.columns().iterator();
-                while (iterator.hasNext()) {
-                    ColumnMetadata columnMetadata = iterator.next();
+                for (ColumnMetadata columnMetadata : row.columns())
+                {
                     Cell cell = row.getCell(columnMetadata);
-                    if (cell.timestamp() > maxTimestamp) {
+                    if (cell.timestamp() > maxTimestamp)
+                    {
                         maxTimestamp = cell.timestamp();
                     }
                 }
             }
         }
 
-        List<ByteBuffer> r = new LinkedList<ByteBuffer>();
-        r.add(ByteBufferUtil.bytes(maxTimestamp));
-        rows.add(r);
-        ResultSet rs = new ResultSet(metadata, rows);
-        return new ResultMessage.Rows(rs);
+        return maxTimestamp;
     }
 
-    public ResultMessage executeInternal(QueryState state, QueryOptions options) throws InvalidRequestException
+    private PartitionIterator fetchPartition(QueryOptions options, QueryState state, long queryStartNanoTime)
     {
-        return execute(state, options, System.nanoTime());
+        TableMetadata tableMetadata = Schema.instance.validateTable(keyspace(), columnFamily());
+        ReadCommand command = createReadCommand(tableMetadata, options);
+        return command.execute(options.getConsistency(), state.getClientState(), queryStartNanoTime);
+    }
+
+    private ReadCommand createReadCommand(TableMetadata tableMetadata, QueryOptions options)
+    {
+        return SinglePartitionReadCommand.fullPartitionRead(tableMetadata,
+                                                            FBUtilities.nowInSeconds(),
+                                                            decoratedKeyForPartition(tableMetadata, options));
+    }
+
+    private ResultSet buildResultSet(long timestamp)
+    {
+        ColumnIdentifier identifier = new ColumnIdentifier("MAX TIMESTAMP", false);
+        LongType type = LongType.instance;
+
+        ColumnSpecification specification = new ColumnSpecification(keyspace(), columnFamily(), identifier, type);
+        List<ColumnSpecification> columnSpecifications = new LinkedList<ColumnSpecification>();
+        columnSpecifications.add(specification);
+
+        List<List<ByteBuffer>> rows = new LinkedList<List<ByteBuffer>>();
+        List<ByteBuffer> r = new LinkedList<ByteBuffer>();
+        r.add(ByteBufferUtil.bytes(timestamp));
+        rows.add(r);
+
+        ResultSet.ResultMetadata metadata = new ResultSet.ResultMetadata(columnSpecifications);
+
+        return new ResultSet(metadata, rows);
     }
 }
