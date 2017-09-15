@@ -123,5 +123,25 @@ public class SelectMaxTimestampTest extends CQLTester
                    row((long)0));
     }
 
+    @Test
+    public void testSelectMaxTimestamp_DifferentTimestampAcrossColumns() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k text, v1 int, v2 int, PRIMARY KEY (k));");
+        execute("INSERT INTO %s (k, v1, v2) VALUES ('bar', 14, 22) USING TIMESTAMP 99;");
+
+        assertRows(execute("SELECT MAX TIMESTAMP %s ('bar');"),
+                   row((long)99));
+
+        execute("UPDATE %s USING TIMESTAMP 148 SET v1 = 296 WHERE k = 'bar';");
+
+        assertRows(execute("SELECT MAX TIMESTAMP %s ('bar');"),
+                   row((long)148));
+
+        execute("UPDATE %s USING TIMESTAMP 220 SET v2 = 104 WHERE k = 'bar';");
+
+        assertRows(execute("SELECT MAX TIMESTAMP %s ('bar');"),
+                   row((long)220));
+    }
+
 }
 

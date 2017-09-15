@@ -124,13 +124,12 @@ public class SelectMaxTimestampStatement extends CFStatement implements CQLState
             {
                 Row row = rowIterator.next();
                 Iterator<ColumnMetadata> iterator = row.columns().iterator();
-                if (!iterator.hasNext()) {
-                    continue;
-                }
-                ColumnMetadata columnMetadata = iterator.next();
-                Cell cell = row.getCell(columnMetadata);
-                if (cell.timestamp() > maxTimestamp) {
-                    maxTimestamp = cell.timestamp();
+                while (iterator.hasNext()) {
+                    ColumnMetadata columnMetadata = iterator.next();
+                    Cell cell = row.getCell(columnMetadata);
+                    if (cell.timestamp() > maxTimestamp) {
+                        maxTimestamp = cell.timestamp();
+                    }
                 }
             }
         }
