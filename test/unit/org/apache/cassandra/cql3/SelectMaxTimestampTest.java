@@ -32,7 +32,7 @@ public class SelectMaxTimestampTest extends CQLTester
     }
 
     @Test
-    public void testInvalidRequestException_TableDoesNotExist() throws Throwable
+    public void testTableOrKeyspaceDoesNotExist() throws Throwable
     {
         assertInvalidThrowMessage("table foo does not exist",
                                   InvalidRequestException.class,
@@ -81,7 +81,7 @@ public class SelectMaxTimestampTest extends CQLTester
     }
 
     @Test
-    public void testSelectMaxTimestamp_CompositePartitionKey() throws Throwable
+    public void testCompositePartitionKey() throws Throwable
     {
         createTable("CREATE TABLE %s (k1 text, k2 text, v int, PRIMARY KEY ((k1, k2)));");
 
@@ -104,7 +104,7 @@ public class SelectMaxTimestampTest extends CQLTester
     }
 
     @Test
-    public void testSelectMaxTimestamp_ParametersMismatch() throws Throwable
+    public void testParametersMismatch() throws Throwable
     {
         createTable("CREATE TABLE %s (k1 text, k2 text, v int, PRIMARY KEY ((k1, k2)));");
 
@@ -114,7 +114,7 @@ public class SelectMaxTimestampTest extends CQLTester
     }
 
     @Test
-    public void testSelectMaxTimestamp_TableHasOnlyPrimaryKeys() throws Throwable
+    public void testTableHasOnlyPrimaryKeys() throws Throwable
     {
         createTable("CREATE TABLE %s (k text, PRIMARY KEY (k));");
         execute("INSERT INTO %s (k) VALUES ('bar') USING TIMESTAMP 99;");
@@ -124,7 +124,7 @@ public class SelectMaxTimestampTest extends CQLTester
     }
 
     @Test
-    public void testSelectMaxTimestamp_DifferentTimestampAcrossColumns() throws Throwable
+    public void testDifferentTimestampAcrossColumns() throws Throwable
     {
         createTable("CREATE TABLE %s (k text, v1 int, v2 int, PRIMARY KEY (k));");
         execute("INSERT INTO %s (k, v1, v2) VALUES ('bar', 14, 22) USING TIMESTAMP 99;");
