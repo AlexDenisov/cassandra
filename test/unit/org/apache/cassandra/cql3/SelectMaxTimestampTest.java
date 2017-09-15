@@ -17,15 +17,23 @@
  */
 package org.apache.cassandra.cql3;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.exceptions.InvalidRequestException;
+import org.apache.cassandra.service.StorageService;
 
 public class SelectMaxTimestampTest extends CQLTester
 {
+    @BeforeClass
+    public static void initServer()
+    {
+        StorageService.instance.initServer();
+    }
 
     @Test
-    public void testInvalidRequestException_TableDoesNotExist() throws Throwable {
+    public void testInvalidRequestException_TableDoesNotExist() throws Throwable
+    {
         assertInvalidThrowMessage("table foo does not exist",
                                   InvalidRequestException.class,
                                   "SELECT MAX TIMESTAMP foo('bar');");
@@ -36,77 +44,82 @@ public class SelectMaxTimestampTest extends CQLTester
     }
 
     @Test
-    public void testSelectATimestamp() throws Throwable {
-        createTable("CREATE TABLE test (key text, v int, PRIMARY KEY (key));");
+    public void testSelectATimestamp() throws Throwable
+    {
+        createTable("CREATE TABLE %s(key text, v int, PRIMARY KEY (key));");
 
-        execute("INSERT INTO test (key, v) VALUES ('foo', 122) USING TIMESTAMP 22;");
+        execute("INSERT INTO %s(key, v) VALUES ('foo', 122) USING TIMESTAMP 22;");
 
         long timestamp = 22;
-        assertRows(execute("SELECT MAX TIMESTAMP test('foo');"),
+        System.out.println(currentTable());
+        assertRows(execute("SELECT MAX TIMESTAMP %s('foo');"),
                    row(timestamp));
     }
 
     @Test
-    public void testSelectMaxTimestamp() throws Throwable {
-        createTable("CREATE TABLE test_selectMaxTimestamp (key text, v int, PRIMARY KEY (key));");
+    public void testSelectMaxTimestamp() throws Throwable
+    {
+        createTable("CREATE TABLE %s (key text, v int, PRIMARY KEY (key));");
 
-        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('foo', 122) USING TIMESTAMP 22;");
-        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('foo', 101) USING TIMESTAMP 4;");
-        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('foo', 94) USING TIMESTAMP 42;");
-        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('foo', 40) USING TIMESTAMP 16;");
+        execute("INSERT INTO %s (key, v) VALUES ('foo', 122) USING TIMESTAMP 22;");
+        execute("INSERT INTO %s (key, v) VALUES ('foo', 101) USING TIMESTAMP 4;");
+        execute("INSERT INTO %s (key, v) VALUES ('foo', 94) USING TIMESTAMP 42;");
+        execute("INSERT INTO %s (key, v) VALUES ('foo', 40) USING TIMESTAMP 16;");
 
-        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp('foo');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s('foo');"),
                    row((long)42));
 
-        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('bar', 232) USING TIMESTAMP 28;");
-        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('bar', 115) USING TIMESTAMP 57;");
-        execute("INSERT INTO test_selectMaxTimestamp (key, v) VALUES ('bar', 12) USING TIMESTAMP 1;");
+        execute("INSERT INTO %s (key, v) VALUES ('bar', 232) USING TIMESTAMP 28;");
+        execute("INSERT INTO %s (key, v) VALUES ('bar', 115) USING TIMESTAMP 57;");
+        execute("INSERT INTO %s (key, v) VALUES ('bar', 12) USING TIMESTAMP 1;");
 
-        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp('bar');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s('bar');"),
                    row((long)57));
 
-        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp('buzz');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s('buzz');"),
                    row((long)0));
     }
 
     @Test
-    public void testSelectMaxTimestamp_CompositePartitionKey() throws Throwable {
-        createTable("CREATE TABLE test_selectMaxTimestamp_CompositePartitionKey (k1 text, k2 text, v int, PRIMARY KEY ((k1, k2)));");
+    public void testSelectMaxTimestamp_CompositePartitionKey() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k1 text, k2 text, v int, PRIMARY KEY ((k1, k2)));");
 
-        execute("INSERT INTO test_selectMaxTimestamp_CompositePartitionKey (k1, k2, v) VALUES ('foo', 'foo', 122) USING TIMESTAMP 22;");
-        execute("INSERT INTO test_selectMaxTimestamp_CompositePartitionKey (k1, k2, v) VALUES ('foo', 'bar', 101) USING TIMESTAMP 4;");
-        execute("INSERT INTO test_selectMaxTimestamp_CompositePartitionKey (k1, k2, v) VALUES ('bar', 'foo', 94) USING TIMESTAMP 42;");
-        execute("INSERT INTO test_selectMaxTimestamp_CompositePartitionKey (k1, k2, v) VALUES ('bar', 'bar', 98) USING TIMESTAMP 63;");
+        execute("INSERT INTO %s (k1, k2, v) VALUES ('foo', 'foo', 122) USING TIMESTAMP 22;");
+        execute("INSERT INTO %s (k1, k2, v) VALUES ('foo', 'bar', 101) USING TIMESTAMP 4;");
+        execute("INSERT INTO %s (k1, k2, v) VALUES ('bar', 'foo', 94) USING TIMESTAMP 42;");
+        execute("INSERT INTO %s (k1, k2, v) VALUES ('bar', 'bar', 98) USING TIMESTAMP 63;");
 
-        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('foo', 'foo');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s('foo', 'foo');"),
                    row((long)22));
-        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('foo', 'bar');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s('foo', 'bar');"),
                    row((long)4));
-        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('bar', 'foo');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s('bar', 'foo');"),
                    row((long)42));
-        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('bar', 'bar');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s('bar', 'bar');"),
                    row((long)63));
 
-        assertRows(execute("SELECT MAX TIMESTAMP test_selectMaxTimestamp_CompositePartitionKey('buzz', 'bar');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s('buzz', 'bar');"),
                    row((long)0));
     }
 
     @Test
-    public void testSelectMaxTimestamp_ParametersMismatch() throws Throwable {
-        createTable("CREATE TABLE testSelectMaxTimestamp_ParametersMismatch (k1 text, k2 text, v int, PRIMARY KEY ((k1, k2)));");
+    public void testSelectMaxTimestamp_ParametersMismatch() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k1 text, k2 text, v int, PRIMARY KEY ((k1, k2)));");
 
-        /// Note: cfName is getting lowercased, because of that the error message is not very user-friendly
-        assertInvalidThrowMessage("Supplied parameters do not match: testselectmaxtimestamp_parametersmismatch has 2 partition keys, but received 1",
-                                  InvalidRequestException.class,
-                                  "SELECT MAX TIMESTAMP testSelectMaxTimestamp_ParametersMismatch('foo');");
+        String reason = "Supplied parameters do not match: " + currentTable() + " has 2 partition keys, but received 1";
+        assertInvalidThrowMessage(reason, InvalidRequestException.class,
+                                  "SELECT MAX TIMESTAMP %s('foo');");
     }
 
     @Test
-    public void testSelectMaxTimestamp_TableHasOnlyPrimaryKeys() throws Throwable {
-        createTable("CREATE TABLE testSelectMaxTimestamp_TableHasOnlyPrimaryKeys (k text, PRIMARY KEY (k));");
-        execute("INSERT INTO testSelectMaxTimestamp_TableHasOnlyPrimaryKeys (k) VALUES ('bar') USING TIMESTAMP 99;");
+    public void testSelectMaxTimestamp_TableHasOnlyPrimaryKeys() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k text, PRIMARY KEY (k));");
+        execute("INSERT INTO %s (k) VALUES ('bar') USING TIMESTAMP 99;");
         /// Did not decide yet if this case should throw an exception
-        assertRows(execute("SELECT MAX TIMESTAMP testSelectMaxTimestamp_TableHasOnlyPrimaryKeys('bar');"),
+        assertRows(execute("SELECT MAX TIMESTAMP %s ('bar');"),
                    row((long)0));
     }
 
